@@ -7,6 +7,8 @@ A beautiful, modern weather application built with Next.js 16, featuring real-ti
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38B2AC?style=flat-square&logo=tailwind-css)
 
+**Live Demo:** [weather-app-five-ivory-48.vercel.app](https://weather-app-five-ivory-48.vercel.app)
+
 ## Features
 
 - **Real-time Weather Data**: Get current weather conditions for any city worldwide
