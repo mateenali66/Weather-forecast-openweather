@@ -2,19 +2,29 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CloudSun, AlertCircle, Github } from 'lucide-react';
+import { CloudSun, AlertCircle, Github, Plane, Cloud } from 'lucide-react';
 import { SearchLocation } from '@/components/search-location';
 import { WeatherDisplay } from '@/components/weather-display';
 import { ForecastDisplay } from '@/components/forecast-display';
 import { AnimatedBackground } from '@/components/animated-background';
+import { AirportSearch } from '@/components/airport-search';
+import { AviationDisplay } from '@/components/aviation-display';
 import { WeatherData, ForecastData, WeatherCondition } from '@/lib/types';
+import { AviationData } from '@/lib/aviation-types';
 import {
   getWeatherCondition,
   getBackgroundGradient,
   isDay as checkIsDay,
 } from '@/lib/weather-utils';
+import { getAviationGradient } from '@/lib/aviation-utils';
+
+type AppMode = 'weather' | 'aviation';
 
 export default function Home() {
+  // Mode state - aviation is default
+  const [mode, setMode] = useState<AppMode>('aviation');
+
+  // Weather mode state
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [forecast, setForecast] = useState<ForecastData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +32,27 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [condition, setCondition] = useState<WeatherCondition>('default');
   const [isDay, setIsDay] = useState(true);
+
+  // Aviation mode state
+  const [aviationData, setAviationData] = useState<AviationData | null>(null);
+  const [aviationLoading, setAviationLoading] = useState(false);
+  const [aviationError, setAviationError] = useState<string | null>(null);
+  const [selectedAirport, setSelectedAirport] = useState<string>('');
+
+  // Load saved mode preference
+  useEffect(() => {
+    const savedMode = typeof window !== 'undefined' ? localStorage.getItem('appMode') as AppMode : null;
+    if (savedMode === 'weather' || savedMode === 'aviation') {
+      setMode(savedMode);
+    }
+  }, []);
+
+  // Save mode preference
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('appMode', mode);
+    }
+  }, [mode]);
 
   const fetchWeather = useCallback(async (params: { city?: string; lat?: number; lon?: number }) => {
     setIsLoading(true);
@@ -66,6 +97,38 @@ export default function Home() {
     }
   }, []);
 
+  const fetchAviationWeather = useCallback(async (location: string, runway?: number) => {
+    setAviationLoading(true);
+    setAviationError(null);
+
+    try {
+      let url = `/api/aviation?location=${encodeURIComponent(location)}`;
+      if (runway) {
+        url += `&runway=${runway}`;
+      }
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.details || data.error || 'Failed to fetch aviation weather');
+      }
+
+      setAviationData(data);
+      setSelectedAirport(location);
+
+      // Save last airport
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lastAirport', location);
+      }
+    } catch (err) {
+      setAviationError(err instanceof Error ? err.message : 'Failed to fetch aviation weather');
+      setAviationData(null);
+    } finally {
+      setAviationLoading(false);
+    }
+  }, []);
+
   const handleSearch = useCallback(
     (city: string) => {
       fetchWeather({ city });
@@ -98,14 +161,38 @@ export default function Home() {
     );
   }, [fetchWeather]);
 
-  // Try to get user's location on first load
-  useEffect(() => {
-    // Check if there's a saved preference or just load a default city
-    const savedCity = typeof window !== 'undefined' ? localStorage.getItem('weatherCity') : null;
-    if (savedCity) {
-      fetchWeather({ city: savedCity });
+  const handleAirportSearch = useCallback(
+    (location: string, runway?: number) => {
+      fetchAviationWeather(location, runway);
+    },
+    [fetchAviationWeather]
+  );
+
+  const handleAviationRefresh = useCallback(() => {
+    if (selectedAirport) {
+      fetchAviationWeather(selectedAirport);
     }
-  }, [fetchWeather]);
+  }, [selectedAirport, fetchAviationWeather]);
+
+  // Load saved city on weather mode
+  useEffect(() => {
+    if (mode === 'weather') {
+      const savedCity = typeof window !== 'undefined' ? localStorage.getItem('weatherCity') : null;
+      if (savedCity && !weather) {
+        fetchWeather({ city: savedCity });
+      }
+    }
+  }, [mode, fetchWeather, weather]);
+
+  // Load saved airport on aviation mode
+  useEffect(() => {
+    if (mode === 'aviation') {
+      const savedAirport = typeof window !== 'undefined' ? localStorage.getItem('lastAirport') : null;
+      if (savedAirport && !aviationData) {
+        fetchAviationWeather(savedAirport);
+      }
+    }
+  }, [mode, fetchAviationWeather, aviationData]);
 
   // Save city to localStorage when weather changes
   useEffect(() => {
@@ -114,7 +201,14 @@ export default function Home() {
     }
   }, [weather?.name]);
 
-  const backgroundGradient = getBackgroundGradient(condition, isDay);
+  // Calculate background gradient based on mode
+  const backgroundGradient =
+    mode === 'aviation' && aviationData?.assessment
+      ? getAviationGradient(aviationData.assessment.overall)
+      : getBackgroundGradient(condition, isDay);
+
+  const currentError = mode === 'weather' ? error : aviationError;
+  const currentLoading = mode === 'weather' ? isLoading : aviationLoading;
 
   return (
     <main
@@ -124,8 +218,8 @@ export default function Home() {
         transition-all duration-1000 ease-in-out
       `}
     >
-      {/* Animated particles based on weather */}
-      <AnimatedBackground condition={condition} isDay={isDay} />
+      {/* Animated particles based on weather (only in weather mode) */}
+      {mode === 'weather' && <AnimatedBackground condition={condition} isDay={isDay} />}
 
       {/* Noise overlay for texture */}
       <div className="absolute inset-0 noise pointer-events-none" />
@@ -144,10 +238,18 @@ export default function Home() {
                 animate={{ rotate: [0, 10, -10, 0] }}
                 transition={{ duration: 4, repeat: Infinity }}
               >
-                <CloudSun className="w-8 h-8 text-white/80" />
+                {mode === 'weather' ? (
+                  <CloudSun className="w-8 h-8 text-white/80" />
+                ) : (
+                  <Plane className="w-8 h-8 text-white/80" />
+                )}
               </motion.div>
               <h1 className="text-xl font-light text-white/90 tracking-wide">
-                Weather<span className="font-semibold">App</span>
+                {mode === 'weather' ? (
+                  <>Weather<span className="font-semibold">App</span></>
+                ) : (
+                  <>Aviation<span className="font-semibold">Wx</span></>
+                )}
               </h1>
             </div>
 
@@ -166,19 +268,60 @@ export default function Home() {
           </div>
         </motion.header>
 
+        {/* Mode Toggle */}
+        <div className="px-4 mb-4">
+          <div className="max-w-md mx-auto">
+            <div className="flex bg-white/10 rounded-xl p-1 backdrop-blur-lg border border-white/10">
+              <button
+                onClick={() => setMode('weather')}
+                className={`
+                  flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg
+                  text-sm font-medium transition-all
+                  ${mode === 'weather'
+                    ? 'bg-white/20 text-white shadow-lg'
+                    : 'text-white/60 hover:text-white/80'}
+                `}
+              >
+                <Cloud className="w-4 h-4" />
+                Weather
+              </button>
+              <button
+                onClick={() => setMode('aviation')}
+                className={`
+                  flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg
+                  text-sm font-medium transition-all
+                  ${mode === 'aviation'
+                    ? 'bg-white/20 text-white shadow-lg'
+                    : 'text-white/60 hover:text-white/80'}
+                `}
+              >
+                <Plane className="w-4 h-4" />
+                Aviation
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Search */}
-        <div className="px-4 py-6">
-          <SearchLocation
-            onSearch={handleSearch}
-            onUseLocation={handleUseLocation}
-            isLoading={isLoading}
-            locationLoading={locationLoading}
-          />
+        <div className="px-4 py-4">
+          {mode === 'weather' ? (
+            <SearchLocation
+              onSearch={handleSearch}
+              onUseLocation={handleUseLocation}
+              isLoading={isLoading}
+              locationLoading={locationLoading}
+            />
+          ) : (
+            <AirportSearch
+              onSearch={handleAirportSearch}
+              isLoading={aviationLoading}
+            />
+          )}
         </div>
 
         {/* Error message */}
         <AnimatePresence>
-          {error && (
+          {currentError && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -188,17 +331,17 @@ export default function Home() {
               <div className="max-w-xl mx-auto">
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/20 border border-red-500/30 text-red-200">
                   <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                  <p className="text-sm">{error}</p>
+                  <p className="text-sm">{currentError}</p>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Weather content */}
+        {/* Main content area */}
         <div className="flex-1 px-4 pb-8">
           <AnimatePresence mode="wait">
-            {isLoading ? (
+            {currentLoading ? (
               <motion.div
                 key="loading"
                 initial={{ opacity: 0 }}
@@ -212,23 +355,65 @@ export default function Home() {
                   className="w-16 h-16 rounded-full border-4 border-white/20 border-t-white/80"
                 />
                 <p className="mt-6 text-white/60 text-lg font-light">
-                  Fetching weather data...
+                  {mode === 'weather' ? 'Fetching weather data...' : 'Fetching aviation weather...'}
                 </p>
               </motion.div>
-            ) : weather && forecast ? (
+            ) : mode === 'weather' ? (
+              weather && forecast ? (
+                <motion.div
+                  key="weather"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <WeatherDisplay weather={weather} />
+                  <ForecastDisplay forecast={forecast} />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="weather-empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex flex-col items-center justify-center py-20"
+                >
+                  <motion.div
+                    animate={{
+                      y: [0, -10, 0],
+                      rotate: [0, 5, -5, 0],
+                    }}
+                    transition={{ duration: 4, repeat: Infinity }}
+                  >
+                    <CloudSun className="w-24 h-24 text-white/30" />
+                  </motion.div>
+                  <h2 className="mt-6 text-2xl font-light text-white/70">
+                    Discover the weather
+                  </h2>
+                  <p className="mt-2 text-white/40 text-center max-w-md">
+                    Search for a city or use your current location to see the
+                    current weather and 5-day forecast
+                  </p>
+                </motion.div>
+              )
+            ) : aviationData ? (
               <motion.div
-                key="weather"
+                key="aviation"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.5 }}
               >
-                <WeatherDisplay weather={weather} />
-                <ForecastDisplay forecast={forecast} />
+                <AviationDisplay
+                  data={aviationData}
+                  airport={selectedAirport}
+                  onRefresh={handleAviationRefresh}
+                  isRefreshing={aviationLoading}
+                />
               </motion.div>
             ) : (
               <motion.div
-                key="empty"
+                key="aviation-empty"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -241,14 +426,14 @@ export default function Home() {
                   }}
                   transition={{ duration: 4, repeat: Infinity }}
                 >
-                  <CloudSun className="w-24 h-24 text-white/30" />
+                  <Plane className="w-24 h-24 text-white/30" />
                 </motion.div>
                 <h2 className="mt-6 text-2xl font-light text-white/70">
-                  Discover the weather
+                  Aviation Weather
                 </h2>
                 <p className="mt-2 text-white/40 text-center max-w-md">
-                  Search for a city or use your current location to see the
-                  current weather and 5-day forecast
+                  Enter an airport code (CYYZ), city, or airport name to get
+                  METAR, TAF, and VFR flying conditions for Cessna 172
                 </p>
               </motion.div>
             )}
@@ -264,14 +449,25 @@ export default function Home() {
         >
           <p className="text-white/30 text-sm font-light">
             Powered by{' '}
-            <a
-              href="https://openweathermap.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-white/50 transition-colors underline underline-offset-2"
-            >
-              OpenWeatherMap
-            </a>
+            {mode === 'weather' ? (
+              <a
+                href="https://openweathermap.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white/50 transition-colors underline underline-offset-2"
+              >
+                OpenWeatherMap
+              </a>
+            ) : (
+              <a
+                href="https://aviationweather.gov/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white/50 transition-colors underline underline-offset-2"
+              >
+                aviationweather.gov
+              </a>
+            )}
           </p>
         </motion.footer>
       </div>
