@@ -7,7 +7,6 @@ import {
   formatMetarTime,
   getTimeAgo,
   getCeilingFromClouds,
-  decodeCloudCover,
   decodeWindDirection,
   parseVisibility,
 } from '@/lib/aviation-utils';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plane, MapPin } from 'lucide-react';
 import { CANADIAN_AIRPORTS, Airport } from '@/lib/aviation-types';
@@ -14,22 +14,17 @@ interface AirportSearchProps {
 export function AirportSearch({ onSearch, isLoading }: AirportSearchProps) {
   const [query, setQuery] = useState('');
   const [runway, setRunway] = useState<string>('');
-  const [suggestions, setSuggestions] = useState<Airport[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // Derive suggestions from query using useMemo instead of useEffect + setState
+  const suggestions = useMemo(() => {
     if (query.length >= 2) {
-      const matches = searchAirports(query);
-      setSuggestions(matches);
-      setShowSuggestions(matches.length > 0);
-    } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
+      return searchAirports(query);
     }
-    setSelectedIndex(-1);
+    return [];
   }, [query]);
 
   useEffect(() => {
@@ -85,7 +80,11 @@ export function AirportSearch({ onSearch, isLoading }: AirportSearchProps) {
               ref={inputRef}
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value.toUpperCase())}
+              onChange={(e) => {
+                setQuery(e.target.value.toUpperCase());
+                setShowSuggestions(true);
+                setSelectedIndex(-1);
+              }}
               onKeyDown={handleKeyDown}
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               placeholder="CYYZ, Toronto, or airport name"
