@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="8" fill="#3b82f6"/>
+  <g transform="translate(4, 4)">
+    <!-- Sun -->
+    <circle cx="12" cy="10" r="5" fill="#fbbf24"/>
+    <!-- Sun rays -->
+    <line x1="12" y1="2" x2="12" y2="4" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="12" y1="16" x2="12" y2="18" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="4" y1="10" x2="6" y2="10" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="18" y1="10" x2="20" y2="10" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="6.34" y1="4.34" x2="7.76" y2="5.76" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="16.24" y1="14.24" x2="17.66" y2="15.66" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="6.34" y1="15.66" x2="7.76" y2="14.24" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="16.24" y1="5.76" x2="17.66" y2="4.34" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Cloud -->
+    <path d="M6 18C4.34 18 3 16.66 3 15C3 13.55 4.04 12.33 5.41 12.07C5.66 10.32 7.16 9 9 9C10.12 9 11.12 9.52 11.78 10.33C12.42 10.12 13.09 10 13.8 10C16.72 10 19.1 12.22 19.1 15C19.1 15.03 19.1 15.07 19.1 15.1C20.2 15.45 21 16.48 21 17.7C21 19.19 19.79 20.4 18.3 20.4H6C4.9 20.4 4 19.5 4 18.4C4 17.3 4.9 16.4 6 16.4" fill="white" fill-opacity="0.95"/>
+  </g>
+</svg>
